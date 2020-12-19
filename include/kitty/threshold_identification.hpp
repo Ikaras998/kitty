@@ -40,6 +40,13 @@
 namespace kitty
 {
 
+
+    void resetRow(REAL* row, int numVars){
+        for(int i = 0; i < numVars+2; i++){
+            row[i] = 0;
+        }
+    }
+
 /*! \brief Threshold logic function identification
 
   Given a truth table, this function determines whether it is a threshold logic function (TF)
@@ -124,10 +131,11 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
       }
   }
 
-
+  //get the ON-SET and OFF-SET cubes
   auto on = isop(ttCopy);
   auto off = isop(~ttCopy);
 
+  //create a LP solver
   lprec *lp;
 
   lp = make_lp(0,numVars+1);
@@ -136,43 +144,83 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
       return 0;
   }
 
-  set_add_rowmode(lp, true);
-  REAL* row = (REAL *) malloc(numVars+1 * sizeof(*row));
-  for(auto c : on){
+  set_add_rowmode(lp, TRUE);
+  std::vector<REAL>constraint(numVars+2,0);
 
+  //objective function creation
+  for(int i = 0; i <= numVars; ++i){
+      constraint[i+1] = 1.0;
+  }
+
+  set_obj_fn(lp, constraint.data());
+
+    //solve ints only
+    for(int i = 0; i <= numVars; ++i){
+        set_int(lp, i , TRUE);
+    }
+
+  //for each variable set Wi >= 0 and T >=0
+  for(int i = 0; i <= numVars; ++i){
+      std::vector<REAL>constraint(numVars+2,0);
+      constraint[i+1] = 1.0;
+      add_constraint(lp,constraint.data(),GE,0);
+  }
+
+    std::vector<REAL>constr(numVars+2,0);
+  for(int i = 0; i <= numVars; ++i){
+      constr[i+1] = 1.0;
+  }
+  constr[numVars+1] = -1.0;
+  add_constraint(lp, constr.data(), GE, 0);
+
+  //for each onset cube create a constraint
+  for(auto c : on){
+      std::vector<REAL>constraint(numVars+2,0);
       for(int i = 0; i < numVars; i ++){
           auto sign = c.get_bit(i);
           auto isPart = c.get_mask(i);
-          row[i] = isPart & sign;
+          constraint[i+1] = isPart && sign;
       }
-      row[numVars] = -1.0;
-      std::cout << "one constraint" << std::endl;
-      add_constraint(lp, row, GE, 0);
+      constraint[numVars+1] = -1.0;
+      add_constraint(lp, constraint.data(), GE, 0);
   }
 
+  //for each offset cube create a constraint
     for(auto c : off){
-
+        std::vector<REAL>constraint(numVars+2,0);
         for(int i = 0; i < numVars; i ++){
-            //auto sign = c.get_bit(i);
+            auto sign = c.get_bit(i);
             auto isPart = c.get_mask(i);
-            row[i] = !isPart;
+            constraint[i+1] = !isPart || (sign && isPart);
         }
-        row[numVars] = -1.0;
-        std::cout << "one constraint" << std::endl;
-        add_constraint(lp, row, LE, -1);
+        constraint[numVars+1] = -1.0;
+        add_constraint(lp, constraint.data(), LE, -1);
     }
+
+    set_add_rowmode(lp,FALSE);
+
+
+    //solve
     auto ret = solve(lp);
     if(ret >= 2){
         return false;
     }
 
-    get_variables(lp, row);
-    for(int i = 0; i < numVars+1; i++){
-        linear_form.push_back(row[i]);
-    }
-    free(row);
+    //get back the solution
+    std::vector<REAL> solution(numVars+1, 0);
+    get_variables(lp, solution.data());
+
   delete_lp(lp);
 
+  linear_form.insert(linear_form.begin(), solution.begin(),solution.end());
+
+  for(int i = 0; i < unateness.size(); i++){
+      if(unateness[i] == 0){
+          auto temp =linear_form[i] * -1;
+          linear_form[i] = temp;
+          linear_form[numVars] += temp;
+      }
+  }
   /* if tt is TF: */
   /* push the weight and threshold values into `linear_form` */
   if ( plf )
@@ -181,7 +229,6 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
   }
   return true;
 }
-
 
 
 } /* namespace kitty */
