@@ -35,6 +35,7 @@
 #include <vector>
 #include <lpsolve/lp_lib.h> /* uncomment this line to include lp_solve */
 #include "traits.hpp"
+#include "isop.hpp"
 
 namespace kitty
 {
@@ -63,31 +64,79 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
 
   auto ttCopy = tt;
 
+
+  //Checks if the function is binate, positive/ negative unate for each variable
   int numVars = tt.num_vars();
-    std::cout << numVars << std::endl;
+  int size = numVars*2;
   for(uint8_t i = 0; i < numVars; i++){
 
-      TT cof1 = cofactor1( ttCopy, i );
-      TT cof0 = cofactor0(ttCopy, i);
+      auto cof1 = cofactor1( ttCopy, i );
+      auto cof0 = cofactor0(ttCopy, i);
 
-      bool posUn = binary_predicate( cof1, cof0, std::greater_equal<>());
-      bool negUn = binary_predicate( cof0, cof1, std::greater_equal<>());
+      int posUn =0 ;
+      int negUn = 0;
 
-      if((posUn)and (negUn)) {
-          std::cout << false << std::endl;
-          return false;
+      auto it2 = cof0.begin();
+      for(auto it1 = cof1.begin(); it1 != cof1.end(); it1++, it2++){
+          uint64_t limit= 1;
+
+          for(int k = 0; k < size; k++){
+              limit *= 2;
+          }
+          uint64_t cof1Bits = *it1;
+          uint64_t cof0Bits = *it2;
+
+
+          for(uint64_t j = 1; j <= limit; j*=2 ){
+              uint64_t maskedCof1 = cof1Bits & j;
+              uint64_t maskedCof0 = cof0Bits & j;
+
+
+              if(maskedCof0 == 0 && maskedCof1 != 0){
+                  posUn = 1;
+              }
+
+              if(maskedCof1 == 0 && maskedCof0 != 0){
+                  negUn = 1;
+              }
+
+              if(posUn == 1 and negUn == 1){
+
+                  return false;
+              }
+
+          }
+
       }
-
-      if(negUn){
+      if(posUn == 1){
+          unateness.push_back(true);
+      }
+      if(negUn == 1){
           unateness.push_back(false);
-          flip_inplace(ttCopy, i);
-
       }
 
-      std::cout << posUn << std::endl;
-      std::cout << negUn << std::endl;
   }
 
+  //if unateness has a 0, flip the corresponding variable
+  for(int i = 0; i < numVars; i ++){
+      if(unateness[i] == 0){
+          flip_inplace( ttCopy, i);
+      }
+  }
+
+
+  auto on = isop(ttCopy);
+  auto off = isop(~ttCopy);
+
+  lprec *lp;
+
+  lp = make_lp(0,0);
+  if(lp == NULL){
+      fprintf(stderr, "Unable to create LP model\n");
+      return 0;
+  }
+
+  delete_lp(lp);
 
   /* if tt is TF: */
   /* push the weight and threshold values into `linear_form` */
@@ -97,6 +146,7 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
   }
   return true;
 }
+
 
 
 } /* namespace kitty */
