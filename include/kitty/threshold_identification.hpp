@@ -107,8 +107,7 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
                   negUn = 1;
               }
 
-              if((posUn == 1 and negUn == 1)){
-
+              if((posUn == 1) and (negUn == 1)){
                   return false;
               }
 
