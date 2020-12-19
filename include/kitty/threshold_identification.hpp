@@ -100,7 +100,7 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
                   negUn = 1;
               }
 
-              if(posUn == 1 and negUn == 1){
+              if((posUn == 1 and negUn == 1)){
 
                   return false;
               }
@@ -130,12 +130,47 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
 
   lprec *lp;
 
-  lp = make_lp(0,0);
+  lp = make_lp(0,numVars+1);
   if(lp == NULL){
       fprintf(stderr, "Unable to create LP model\n");
       return 0;
   }
 
+  set_add_rowmode(lp, true);
+  REAL* row = (REAL *) malloc(numVars+1 * sizeof(*row));
+  for(auto c : on){
+
+      for(int i = 0; i < numVars; i ++){
+          auto sign = c.get_bit(i);
+          auto isPart = c.get_mask(i);
+          row[i] = isPart & sign;
+      }
+      row[numVars] = -1.0;
+      std::cout << "one constraint" << std::endl;
+      add_constraint(lp, row, GE, 0);
+  }
+
+    for(auto c : off){
+
+        for(int i = 0; i < numVars; i ++){
+            //auto sign = c.get_bit(i);
+            auto isPart = c.get_mask(i);
+            row[i] = !isPart;
+        }
+        row[numVars] = -1.0;
+        std::cout << "one constraint" << std::endl;
+        add_constraint(lp, row, LE, -1);
+    }
+    auto ret = solve(lp);
+    if(ret >= 2){
+        return false;
+    }
+
+    get_variables(lp, row);
+    for(int i = 0; i < numVars+1; i++){
+        linear_form.push_back(row[i]);
+    }
+    free(row);
   delete_lp(lp);
 
   /* if tt is TF: */
