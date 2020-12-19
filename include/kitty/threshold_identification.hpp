@@ -85,7 +85,7 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
       }
 
       std::cout << posUn << std::endl;
-      std::cout << negUn << std::endl;*/
+      std::cout << negUn << std::endl;
   }
 
 
