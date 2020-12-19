@@ -33,7 +33,7 @@
 #pragma once
 
 #include <vector>
-// #include <lpsolve/lp_lib.h> /* uncomment this line to include lp_solve */
+#include <lpsolve/lp_lib.h> /* uncomment this line to include lp_solve */
 #include "traits.hpp"
 
 namespace kitty
@@ -59,10 +59,35 @@ template<typename TT, typename = std::enable_if_t<is_complete_truth_table<TT>::v
 bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
 {
   std::vector<int64_t> linear_form;
+  std::vector<bool> unateness;
 
-  /* TODO */
-  /* if tt is non-TF: */
-  return false;
+  auto ttCopy = tt;
+
+  int numVars = tt.num_vars();
+    std::cout << numVars << std::endl;
+  for(uint8_t i = 0; i < numVars; i++){
+
+      TT cof1 = cofactor1( ttCopy, i );
+      TT cof0 = cofactor0(ttCopy, i);
+
+      bool posUn = binary_predicate( cof1, cof0, std::greater_equal<>());
+      bool negUn = binary_predicate( cof0, cof1, std::greater_equal<>());
+
+      if((posUn)and (negUn)) {
+          std::cout << false << std::endl;
+          return false;
+      }
+
+      if(negUn){
+          unateness.push_back(false);
+          flip_inplace(ttCopy, i);
+
+      }
+
+      std::cout << posUn << std::endl;
+      std::cout << negUn << std::endl;*/
+  }
+
 
   /* if tt is TF: */
   /* push the weight and threshold values into `linear_form` */
@@ -72,5 +97,6 @@ bool is_threshold( const TT& tt, std::vector<int64_t>* plf = nullptr )
   }
   return true;
 }
+
 
 } /* namespace kitty */
